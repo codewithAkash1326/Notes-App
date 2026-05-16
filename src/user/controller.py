@@ -38,7 +38,15 @@ def share_note(note_id:int , email: str, user: User, db: Session = Depends(get_d
                 "message": "You are not authorized to share this note"
             }
         )
-    
+
+    if note.is_archived:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "message": "Archived notes cannot be shared"
+            }
+        )
+ 
     db_user = db.query(User).filter(User.email == email).first()
 
     if not db_user:
@@ -46,6 +54,14 @@ def share_note(note_id:int , email: str, user: User, db: Session = Depends(get_d
             status_code=404,
             content={
                 "message": "User not found with this email"
+            }
+        )
+    
+    if db_user.id == user.id:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "message": "You cannot share note with yourself"
             }
         )
     
@@ -80,7 +96,7 @@ def share_note(note_id:int , email: str, user: User, db: Session = Depends(get_d
 
 
 def get_note_by_id(id:int , user:User , db:Session = Depends(get_db)):
-    db_note = db.query(Note).filter(Note.id == id).first()
+    db_note = db.query(Note).filter(Note.id == id , Note.is_archived == False).first()
 
     if not db_note:
         return JSONResponse(
@@ -99,6 +115,7 @@ def get_note_by_id(id:int , user:User , db:Session = Depends(get_db)):
                 "message": "You are not authorized to view this note"
             }
         )
+
     
     return JSONResponse(
         status_code=200,
@@ -106,6 +123,7 @@ def get_note_by_id(id:int , user:User , db:Session = Depends(get_db)):
             "id": db_note.id,
             "title": db_note.title,
             "content": db_note.content,
+            "is_archived": db_note.is_archived,
             "created_at": str(db_note.created_at),
             "updated_at": str(db_note.updated_at)
         }
@@ -114,23 +132,20 @@ def get_note_by_id(id:int , user:User , db:Session = Depends(get_db)):
 
 
 def delete_note(id:int , user:User , db:Session = Depends(get_db)):
-    db_note = db.query(Note).filter(Note.id == id).first()
+    db_note = db.query(Note).filter(
+        Note.id == id,
+        Note.owner_id == user.id,
+    ).first()
+
 
     if not db_note:
         return JSONResponse(
             status_code=404,
             content={
-                "message": "Note not found"
+                "message": "Active Note not found"
             }
         )
     
-    if db_note.owner_id != user.id:
-        return JSONResponse(
-            status_code=403,
-             content = {
-                "message": "You are not authorized to delete this note"
-            }
-        )
     
     db.delete(db_note)
     db.commit()
@@ -138,30 +153,25 @@ def delete_note(id:int , user:User , db:Session = Depends(get_db)):
     return JSONResponse(
         status_code=204,
         content = {
-            "message": "Note deleted successfully"
+             
         }
     )
 
 
 def update_note(id:int , note:CreateNotePayload , user:User , db:Session = Depends(get_db)):
-    db_note = db.query(Note).filter(Note.id == id).first()
+    db_note = db.query(Note).filter(
+        Note.id == id,
+        Note.owner_id == user.id,
+    ).first()
 
     if not db_note:
         return JSONResponse(
             status_code=404,
             content={
-                "message": "Note not found"
+                "message": "Active Note not found"
             }
         )
     
-   
-    if db_note.owner_id != user.id:
-        return JSONResponse(
-            status_code=403,
-            content={
-                "message": "You are not authorized to update this note"
-            }
-        )
     
     db_note.title = note.title
     db_note.content = note.content
@@ -182,9 +192,10 @@ def update_note(id:int , note:CreateNotePayload , user:User , db:Session = Depen
  
 
 def get_notes(user: User, db: Session = Depends(get_db)):
-    notes = db.query(Note).filter(Note.owner_id == user.id).all()
-
-    if not notes:
+    
+    owned_notes = db.query(Note).filter(Note.owner_id == user.id, Note.is_archived == False).all()
+     
+    if not owned_notes:
         return JSONResponse(
             status_code=200,
             content={
@@ -195,19 +206,107 @@ def get_notes(user: User, db: Session = Depends(get_db)):
 
     response = []
 
-    for note in notes:
+    for note in owned_notes:
         response.append({
             "id": note.id,
             "title": note.title,
             "content": note.content,
+            "is_archived": note.is_archived,
             "created_at": str(note.created_at),
             "updated_at": str(note.updated_at)
         })
 
     return JSONResponse(
         status_code=200,
-        content=  response
-        
+        content=response
+    )
+
+def get_archived_notes(user: User, db: Session):
+    
+    notes = db.query(Note).filter(Note.owner_id == user.id, Note.is_archived == True).all()
+
+    if not notes:
+        return JSONResponse(
+            status_code=200,
+            content={
+                "message": "No archived notes found",
+                "data": []
+            }
+        )
+
+    response = []
+    for note in notes:
+        response.append({
+            "id": note.id,
+            "title": note.title,
+            "content": note.content,
+            "is_archived": note.is_archived,
+            "created_at": str(note.created_at),
+            "updated_at": str(note.updated_at)
+        })
+
+    return JSONResponse(
+        status_code=200,
+        content=response
+    )
+
+def archive_note(id: int, user: User, db: Session):
+    db_note = db.query(Note).filter(Note.id == id ,  Note.owner_id == user.id).first()
+
+    if not db_note:
+        return JSONResponse(
+            status_code=404,
+            content={"message": "Note not found"}
+        )
+    
+    if db_note.is_archived:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "message": "Note already archived"
+            }
+        )
+
+
+    db_note.is_archived = True
+    db.commit()
+
+    return JSONResponse(
+        status_code=200,
+        content={
+            "message": "Note archived successfully"
+        }
+    )
+
+def restore_note(id: int, user: User, db: Session):
+    db_note = db.query(Note).filter(
+        Note.id == id,
+        Note.owner_id == user.id
+    ).first()
+
+
+    if not db_note:
+        return JSONResponse(
+            status_code=404,
+            content={"message": "Note not found"}
+        )
+
+    if not db_note.is_archived:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "message": "Note is already active"
+            }
+        )
+
+    db_note.is_archived = False
+    db.commit()
+
+    return JSONResponse(
+        status_code=200,
+        content={
+            "message": "Note restored successfully"
+        }
     )
  
 

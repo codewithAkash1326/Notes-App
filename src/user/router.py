@@ -26,6 +26,18 @@ def create_note( note: CreateNotePayload, db: Session = Depends(get_db), current
 def get_notes(user: User = Depends(is_authenticated) , db: Session = Depends(get_db)):
     return controller.get_notes(user,db)
 
+@api_router.get('/notes/archived')
+def get_archived_notes(user: User = Depends(is_authenticated) , db: Session = Depends(get_db)):
+    return controller.get_archived_notes(user, db)
+
+@api_router.patch('/notes/{id}/archive')
+def archive_note(id: int, user: User = Depends(is_authenticated), db: Session = Depends(get_db)):
+    return controller.archive_note(id, user, db)
+
+@api_router.patch('/notes/{id}/restore')
+def restore_note(id: int, user: User = Depends(is_authenticated), db: Session = Depends(get_db)):
+    return controller.restore_note(id, user, db)
+
 @api_router.get('/notes/{id}')
 def get_note_by_id(id:int ,user:User = Depends(is_authenticated) , db:Session = Depends(get_db)):
     return controller.get_note_by_id(id,user,db);
@@ -41,3 +53,13 @@ def delete_note(id:int , user:User = Depends(is_authenticated) , db:Session = De
 @api_router.post('/notes/{note_id}/share')
 def share_note(note_id:int , body: ShareNotePayload, user: User = Depends(is_authenticated), db: Session = Depends(get_db)):
     return controller.share_note(note_id, body.email, user, db)
+
+@api_router.get('/about')
+def about():
+    return {
+        "name": "Akash Chaudhary",
+        "email": "your-email@gmail.com",
+        "my_features": {
+            "Archive Notes": "Implemented archive and restore functionality to allow users to hide notes without permanently deleting them. Archived notes are hidden from normal access and sharing."
+        }
+    }

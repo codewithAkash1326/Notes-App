@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Boolean
 from datetime import datetime
 
 from src.utils.db import Base
@@ -47,6 +47,16 @@ class Note(Base):
     content = Column(
         Text,
         nullable=False
+    )
+
+    is_archived = Column(
+        Boolean,
+        default=False
+    )
+
+    is_archived = Column(
+        Boolean,
+        default=False
     )
 
     owner_id = Column(
