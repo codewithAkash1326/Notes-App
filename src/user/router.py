@@ -58,7 +58,7 @@ def share_note(note_id:int , body: ShareNotePayload, user: User = Depends(is_aut
 def about():
     return {
         "name": "Akash Chaudhary",
-        "email": "your-email@gmail.com",
+        "email": "akashchaudhary48898@gmail.com",
         "my_features": {
             "Archive Notes": "Implemented archive and restore functionality to allow users to hide notes without permanently deleting them. Archived notes are hidden from normal access and sharing."
         }
